@@ -37,7 +37,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: "https://phonebook-front-2rlkoi2lk-issou24s-projects.vercel.app/", // ou app.use(cors()) pour tout autoriser
+    origin: "https://phonebook-front-2rlkoi2lk-issou24s-projects.vercel.app", // ou app.use(cors()) pour tout autoriser
   })
 );
 
