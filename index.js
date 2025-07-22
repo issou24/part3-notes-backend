@@ -1,79 +1,168 @@
-const express = require('express')
-const app = express()
+const express = require("express");
+const cors = require("cors");
+const app = express();
+
+let persons = require("./models/persons");
+var morgan = require("morgan");
 
 let notes = [
   {
-    id: '1',
-    content: 'HTML is easy',
+    id: "1",
+    content: "HTML is easy",
     important: true,
   },
   {
-    id: '2',
-    content: 'Browser can execute only JavaScript',
+    id: "2",
+    content: "Browser can execute only JavaScript",
     important: false,
   },
   {
-    id: '3',
-    content: 'GET and POST are the most important methods of HTTP protocol',
+    id: "3",
+    content: "GET and POST are the most important methods of HTTP protocol",
     important: true,
   },
-]
+];
 
-app.use(express.json())
+app.use(express.json());
 
-app.get('/', (request, response) => {
-  response.send('<h1>Hello World!</h1>')
-})
+app.use(
+  cors({
+    origin: "http://localhost:5173", // ou app.use(cors()) pour tout autoriser
+  })
+);
 
-app.get('/api/notes', (request, response) => {
-  response.json(notes)
-})
+morgan.token("body", (req) => JSON.stringify(req.body));
 
-app.get('/api/notes/:id', (request, response) => {
-  const id = request.params.id
-  const note = notes.find((note) => note.id === id)
+app.use(
+  morgan(function (tokens, req, res) {
+    return [
+      tokens.method(req, res),
+      tokens.url(req, res),
+      tokens.status(req, res),
+      tokens.res(req, res, "content-length"),
+      "-",
+      tokens["response-time"](req, res),
+      "ms",
+      tokens.body(req, res), // ajoute le body ici
+    ].join(" ");
+  })
+);
+
+app.get("/", (request, response) => {
+  response.send("<h1>Hello World!</h1>");
+});
+
+app.get("/api/notes", (request, response) => {
+  response.json(notes);
+});
+
+app.get("/api/notes/:id", (request, response) => {
+  const id = request.params.id;
+  const note = notes.find((note) => note.id === id);
 
   if (note) {
-    response.json(note)
+    response.json(note);
   } else {
-    response.status(404).end()
+    response.status(404).end();
   }
-})
+});
 
 const generateId = () => {
   const maxId =
-    notes.length > 0 ? Math.max(...notes.map((n) => Number(n.id))) : 0
-  return String(maxId + 1)
-}
+    notes.length > 0 ? Math.max(...notes.map((n) => Number(n.id))) : 0;
+  return String(maxId + 1);
+};
 
-app.post('/api/notes', (request, response) => {
-  const body = request.body
+const generateIdRandom = () => {
+  return Math.floor(Math.random() * 1000000000000000000000000);
+};
+
+app.post("/api/notes", (request, response) => {
+  const body = request.body;
 
   if (!body.content) {
     return response.status(400).json({
-      error: 'content missing',
-    })
+      error: "content missing",
+    });
   }
 
   const note = {
     content: body.content,
     important: body.important || false,
     id: generateId(),
+  };
+
+  notes = notes.concat(note);
+
+  response.json(note);
+});
+
+app.delete("/api/notes/:id", (request, response) => {
+  const id = request.params.id;
+  notes = notes.filter((note) => note.id !== id);
+
+  response.status(204).end();
+});
+
+app.get("/api/persons", (request, response) => {
+  response.json(persons);
+});
+
+app.get("/api/persons/:id", (request, response) => {
+  const id = Number(request.params.id); // récupérer l'id en nombre
+  const person = persons.find((p) => p.id === id); // chercher la personne
+
+  if (person) {
+    response.json(person);
+  } else {
+    response.status(404).end(); // pas trouvé, on renvoie 404
+  }
+});
+
+app.delete("/api/persons/:id", (request, response) => {
+  const id = Number(request.params.id); // récupérer l'id en nombre
+  persons = persons.filter((person) => person.id !== id); // chercher la personne
+
+  response.status(204).end();
+});
+
+app.get("/info", (request, response) => {
+  const now = new Date();
+  const entriesCount = persons.length;
+
+  response.send(
+    `<p>Phonebook has info for ${entriesCount} people</p>` + `<p>${now}</p>`
+  );
+});
+
+app.post("/api/persons", (request, response) => {
+  const body = request.body;
+
+  if (!body.name || !body.number) {
+    return response.status(400).json({
+      error: "Le nom ou le numéro est manquant",
+    });
   }
 
-  notes = notes.concat(note)
+  const nameExists = persons.some((p) => p.name === body.name);
+  if (nameExists) {
+    return response.status(400).json({
+      error: "Le nom doit être unique",
+    });
+  }
 
-  response.json(note)
-})
+  const person = {
+    id: generateIdRandom(),
+    name: body.name,
+    number: body.number,
+  };
 
-app.delete('/api/notes/:id', (request, response) => {
-  const id = request.params.id
-  notes = notes.filter((note) => note.id !== id)
+  persons.push(person);
 
-  response.status(204).end()
-})
+  response.json(person);
+});
 
-const PORT = 3001
+const PORT = 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});
