@@ -33,6 +33,13 @@ let notes = [
   },
 ];
 
+app.use((req, res, next) => {
+  if (req.method === "DELETE") {
+    console.log(`DELETE ${req.originalUrl} - id: ${req.params.id}`);
+  }
+  next();
+});
+
 app.use(express.json());
 
 app.use(cors());
@@ -77,10 +84,6 @@ const generateId = () => {
   const maxId =
     notes.length > 0 ? Math.max(...notes.map((n) => Number(n.id))) : 0;
   return String(maxId + 1);
-};
-
-const generateIdRandom = () => {
-  return Math.floor(Math.random() * 1000000000000000000000000);
 };
 
 app.post("/api/notes", (request, response) => {
