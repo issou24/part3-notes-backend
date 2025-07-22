@@ -107,10 +107,10 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch(next);
 });
 
-app.delete("/api/persons/:id", async (req, res, next) => {
+app.delete("/api/persons/:id", async (req, res) => {
   const id = req.params.id;
 
-  if (!isValidObjectId(id)) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ error: "malformatted id" });
   }
 
@@ -121,7 +121,8 @@ app.delete("/api/persons/:id", async (req, res, next) => {
     }
     res.status(204).end();
   } catch (error) {
-    next(error);
+    console.error("Erreur suppression:", error);
+    res.status(500).json({ error: "Erreur serveur lors de la suppression" });
   }
 });
 
