@@ -1,10 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-let Person = require("./models/person");
-const app = express();
+const Person = require("./models/person");
+const morgan = require("morgan");
 
-var morgan = require("morgan");
+const app = express();
 
 mongoose.set("strictQuery", false);
 
@@ -15,33 +15,8 @@ mongoose
   .connect(url)
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("Error connecting:", error.message));
-let notes = [
-  {
-    id: "1",
-    content: "HTML is easy",
-    important: true,
-  },
-  {
-    id: "2",
-    content: "Browser can execute only JavaScript",
-    important: false,
-  },
-  {
-    id: "3",
-    content: "GET and POST are the most important methods of HTTP protocol",
-    important: true,
-  },
-];
-
-app.use((req, res, next) => {
-  if (req.method === "DELETE") {
-    console.log(`DELETE ${req.originalUrl} - id: ${req.params.id}`);
-  }
-  next();
-});
 
 app.use(express.json());
-
 app.use(cors());
 
 morgan.token("body", (req) => JSON.stringify(req.body));
@@ -56,109 +31,134 @@ app.use(
       "-",
       tokens["response-time"](req, res),
       "ms",
-      tokens.body(req, res), // ajoute le body ici
+      tokens.body(req, res),
     ].join(" ");
   })
 );
 
-app.get("/", (request, response) => {
-  response.send("<h1>Hello World!</h1>");
+app.get("/", (req, res) => {
+  res.send("<h1>Hello World!</h1>");
 });
 
-app.get("/api/notes", (request, response) => {
-  response.json(notes);
+// Notes API (unchanged)
+let notes = [
+  { id: "1", content: "HTML is easy", important: true },
+  { id: "2", content: "Browser can execute only JavaScript", important: false },
+  {
+    id: "3",
+    content: "GET and POST are the most important methods of HTTP protocol",
+    important: true,
+  },
+];
+
+app.get("/api/notes", (req, res) => {
+  res.json(notes);
 });
 
-app.get("/api/notes/:id", (request, response) => {
-  const id = request.params.id;
+app.get("/api/notes/:id", (req, res) => {
+  const id = req.params.id;
   const note = notes.find((note) => note.id === id);
-
-  if (note) {
-    response.json(note);
-  } else {
-    response.status(404).end();
-  }
+  if (note) res.json(note);
+  else res.status(404).end();
 });
 
-const generateId = () => {
-  const maxId =
-    notes.length > 0 ? Math.max(...notes.map((n) => Number(n.id))) : 0;
-  return String(maxId + 1);
-};
-
-app.post("/api/notes", (request, response) => {
-  const body = request.body;
-
-  if (!body.content) {
-    return response.status(400).json({
-      error: "content missing",
-    });
-  }
+app.post("/api/notes", (req, res) => {
+  const body = req.body;
+  if (!body.content) return res.status(400).json({ error: "content missing" });
 
   const note = {
     content: body.content,
     important: body.important || false,
-    id: generateId(),
+    id: (Math.max(...notes.map((n) => Number(n.id))) + 1).toString(),
   };
 
   notes = notes.concat(note);
-
-  response.json(note);
+  res.json(note);
 });
 
-app.delete("/api/notes/:id", (request, response) => {
-  const id = request.params.id;
+app.delete("/api/notes/:id", (req, res) => {
+  const id = req.params.id;
   notes = notes.filter((note) => note.id !== id);
-
-  response.status(204).end();
+  res.status(204).end();
 });
 
-app.get("/api/persons", (req, res) => {
-  Person.find({}).then((persons) => {
-    res.json(persons);
-  });
+// === PERSONS API ===
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+app.get("/api/persons", (req, res, next) => {
+  Person.find({})
+    .then((persons) => res.json(persons))
+    .catch(next);
 });
 
-app.get("/api/persons/:id", (req, res) => {
-  Person.findById(req.params.id)
+app.get("/api/persons/:id", (req, res, next) => {
+  const id = req.params.id;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ error: "malformatted id" });
+  }
+
+  Person.findById(id)
     .then((person) => {
-      if (person) {
-        res.json(person);
-      } else {
-        res.status(404).end();
-      }
+      if (person) res.json(person);
+      else res.status(404).end();
     })
-    .catch(() => res.status(400).send({ error: "malformatted id" }));
+    .catch(next);
 });
 
-app.delete("/api/persons/:id", (req, res) => {
-  Person.findByIdAndRemove(req.params.id)
-    .then(() => res.status(204).end())
-    .catch(() => res.status(400).send({ error: "malformatted id" }));
+app.delete("/api/persons/:id", async (req, res, next) => {
+  const id = req.params.id;
+
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ error: "malformatted id" });
+  }
+
+  try {
+    const deletedPerson = await Person.findByIdAndRemove(id);
+    if (!deletedPerson) {
+      return res.status(404).json({ error: "person not found" });
+    }
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post("/api/persons", (req, res) => {
-  const body = req.body;
+app.post("/api/persons", async (req, res, next) => {
+  const { name, number } = req.body;
 
-  if (!body.name || !body.number) {
+  if (!name || !number) {
     return res.status(400).json({ error: "Le nom ou le numéro est manquant" });
   }
 
-  // Vérifie si le nom existe déjà
-  Person.findOne({ name: body.name }).then((existing) => {
+  try {
+    const existing = await Person.findOne({ name });
     if (existing) {
       return res.status(400).json({ error: "Le nom doit être unique" });
     }
 
-    const person = new Person({
-      name: body.name,
-      number: body.number,
-    });
+    const person = new Person({ name, number });
+    const savedPerson = await person.save();
+    res.json(savedPerson);
+  } catch (error) {
+    next(error);
+  }
+});
 
-    person.save().then((savedPerson) => {
-      res.json(savedPerson);
-    });
-  });
+// Middleware gestion erreurs
+app.use((error, req, res, next) => {
+  console.error(error.message);
+
+  if (error.name === "CastError" && error.kind === "ObjectId") {
+    return res.status(400).json({ error: "malformatted id" });
+  }
+
+  if (error.name === "ValidationError") {
+    return res.status(400).json({ error: error.message });
+  }
+
+  res.status(500).json({ error: "Internal server error" });
 });
 
 const PORT = 3001;
