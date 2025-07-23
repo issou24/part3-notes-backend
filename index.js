@@ -107,7 +107,7 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch(next);
 });
 
-aapp.delete("/api/persons/:id", async (req, res) => {
+app.delete("/api/persons/:id", async (req, res) => {
   const id = req.params.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
