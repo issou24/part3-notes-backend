@@ -115,7 +115,7 @@ app.delete("/api/persons/:id", async (req, res) => {
   }
 
   try {
-    const deletedPerson = await Person.findByIdAndRemove(id);
+    const deletedPerson = await Person.findByIdAndDelete(id);
     if (!deletedPerson) {
       return res.status(404).json({ error: "person not found" });
     }
