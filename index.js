@@ -122,7 +122,7 @@ app.delete("/api/persons/:id", async (req, res) => {
     res.status(204).end();
   } catch (error) {
     console.error("Erreur suppression:", error);
-    res.status(500).json({ error: "Erreur serveur lors de la suppression" });
+    next(error);
   }
 });
 
