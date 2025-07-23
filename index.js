@@ -178,11 +178,14 @@ app.post("/api/persons", async (req, res, next) => {
     if (existing) {
       return res.status(400).json({ error: "Le nom doit être unique" });
     }
-
     const person = new Person({ name, number });
     const savedPerson = await person.save();
     res.json(savedPerson);
   } catch (error) {
+    if (error.name === "ValidationError") {
+      // Envoie le message d'erreur de validation au front
+      return res.status(400).json({ error: error.message });
+    }
     next(error);
   }
 });
