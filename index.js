@@ -187,6 +187,35 @@ app.post("/api/persons", async (req, res, next) => {
   }
 });
 
+app.put("/api/persons", async (req, res, next) => {
+  const { name, number } = req.body;
+
+  const updatedPerson = {
+    name,
+    number,
+  };
+
+  try {
+    const result = await Person.findByIdAndUpdate(
+      req.params.id,
+      updatedPerson,
+      {
+        new: true, // renvoie la version mise à jour
+        runValidators: true, // applique les règles du schéma
+        context: "query", // nécessaire pour les validators Mongoose
+      }
+    );
+
+    if (result) {
+      res.json(result);
+    } else {
+      res.status(404).json({ error: "Person not found" });
+    }
+  } catch (error) {
+    next(error); // transmet au middleware d'erreur
+  }
+});
+
 // Middleware gestion erreurs
 app.use((error, req, res, next) => {
   console.error(error.message);
