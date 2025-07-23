@@ -3,7 +3,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const Person = require("./models/person");
 const morgan = require("morgan");
-
+const errorHandler = require("./middlewares/errorHandler");
 const app = express();
 
 mongoose.set("strictQuery", false);
@@ -55,31 +55,64 @@ app.get("/api/notes", (req, res) => {
   res.json(notes);
 });
 
-app.get("/api/notes/:id", (req, res) => {
-  const id = req.params.id;
-  const note = notes.find((note) => note.id === id);
-  if (note) res.json(note);
-  else res.status(404).end();
+app.get("/api/notes/:id", (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const note = notes.find((note) => note.id === id);
+
+    if (note) {
+      res.json(note);
+    } else {
+      // Si aucune note trouvée, on crée une erreur et on la passe à next()
+      const err = new Error("Note not found");
+      err.status = 404;
+      next(err);
+    }
+  } catch (err) {
+    next(err); // Pour capturer les erreurs inattendues
+  }
 });
 
-app.post("/api/notes", (req, res) => {
-  const body = req.body;
-  if (!body.content) return res.status(400).json({ error: "content missing" });
+app.post("/api/notes", (req, res, next) => {
+  try {
+    const body = req.body;
 
-  const note = {
-    content: body.content,
-    important: body.important || false,
-    id: (Math.max(...notes.map((n) => Number(n.id))) + 1).toString(),
-  };
+    if (!body.content) {
+      const err = new Error("Content missing");
+      err.status = 400;
+      return next(err);
+    }
 
-  notes = notes.concat(note);
-  res.json(note);
+    const note = {
+      content: body.content,
+      important: body.important || false,
+      id: (Math.max(...notes.map((n) => Number(n.id))) + 1).toString(),
+    };
+
+    notes = notes.concat(note);
+    res.status(201).json(note);
+  } catch (err) {
+    next(err);
+  }
 });
 
-app.delete("/api/notes/:id", (req, res) => {
-  const id = req.params.id;
-  notes = notes.filter((note) => note.id !== id);
-  res.status(204).end();
+app.delete("/api/notes/:id", (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const initialLength = notes.length;
+
+    notes = notes.filter((note) => note.id !== id);
+
+    if (notes.length === initialLength) {
+      const err = new Error("Note not found");
+      err.status = 404;
+      return next(err);
+    }
+
+    res.status(204).end(); // Suppression réussie, pas de contenu
+  } catch (err) {
+    next(err);
+  }
 });
 
 // === PERSONS API ===
@@ -87,24 +120,31 @@ app.delete("/api/notes/:id", (req, res) => {
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-app.get("/api/persons", (req, res, next) => {
-  Person.find({})
-    .then((persons) => res.json(persons))
-    .catch(next);
+app.get("/api/persons", async (req, res, next) => {
+  try {
+    const persons = await Person.find({});
+    res.json(persons);
+  } catch (err) {
+    next(err); // Middleware d'erreur
+  }
 });
 
-app.get("/api/persons/:id", (req, res, next) => {
+app.get("/api/persons/:id", async (req, res, next) => {
   const id = req.params.id;
+
   if (!isValidObjectId(id)) {
-    return res.status(400).json({ error: "malformatted id" });
+    return res.status(400).json({ error: "Malformatted ID" });
   }
 
-  Person.findById(id)
-    .then((person) => {
-      if (person) res.json(person);
-      else res.status(404).end();
-    })
-    .catch(next);
+  try {
+    const person = await Person.findById(id);
+    if (!person) {
+      return res.status(404).json({ error: "Person not found" });
+    }
+    res.json(person);
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.delete("/api/persons/:id", async (req, res) => {
