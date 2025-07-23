@@ -107,7 +107,7 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch(next);
 });
 
-app.delete("/api/persons/:id", async (req, res) => {
+aapp.delete("/api/persons/:id", async (req, res) => {
   const id = req.params.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -115,14 +115,14 @@ app.delete("/api/persons/:id", async (req, res) => {
   }
 
   try {
-    const deletedPerson = await Person.findByIdAndDelete(id);
+    const deletedPerson = await Person.findByIdAndDelete(id); // ✅ CORRECTION ICI
     if (!deletedPerson) {
       return res.status(404).json({ error: "person not found" });
     }
     res.status(204).end();
   } catch (error) {
     console.error("Erreur suppression:", error);
-    next(error);
+    res.status(500).json({ error: "Erreur serveur lors de la suppression" });
   }
 });
 
