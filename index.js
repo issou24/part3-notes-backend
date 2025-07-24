@@ -3,7 +3,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const Person = require("./models/person");
 const morgan = require("morgan");
-const errorHandler = require("./middlewares/errorHandler");
+
 const app = express();
 
 mongoose.set("strictQuery", false);
@@ -220,7 +220,7 @@ app.put("/api/persons", async (req, res, next) => {
 });
 
 // Middleware gestion erreurs
-app.use((error, req, res, next) => {
+app.use((error, req, res) => {
   console.error(error.message);
 
   if (error.name === "CastError" && error.kind === "ObjectId") {
